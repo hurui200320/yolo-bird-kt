@@ -12,8 +12,8 @@ import java.awt.image.BufferedImage
 import java.io.File
 import kotlin.math.ceil
 import kotlin.time.measureTime
+import kotlin.time.toDuration
 
-private const val reportTimer = 2000
 private const val confidenceThreshold = 0.7f
 private const val nmsThreshold = 0.4
 
@@ -52,15 +52,14 @@ fun main(): Unit = runBlocking {
                 result.flatten().any { it.className == "bird" }.also { System.gc() }
             }
             println()
-            println(if (hasBird) "Bird detected!" else "Boring...")
+            print(if (hasBird) "Bird detected!" else "Boring...")
             file.copyTo(
                 File(if (hasBird) birdFolder else boringFolder, file.name),
                 overwrite = true
             )
             file.delete()
-            println("Done!")
         }
-        println(time)
+        println("Time consumed: $time, ${video.size.toDouble() / time.inWholeSeconds} fps")
         System.gc()
     }
 
