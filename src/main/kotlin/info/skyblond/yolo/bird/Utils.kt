@@ -2,101 +2,54 @@ package info.skyblond.yolo.bird
 
 import com.github.ajalt.colormath.Color
 import com.github.ajalt.colormath.model.Oklch
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.channels.ReceiveChannel
+import kotlinx.coroutines.launch
+import org.bytedeco.ffmpeg.global.avutil
+import org.bytedeco.ffmpeg.global.avutil.AV_PIX_FMT_BGR24
+import org.bytedeco.javacv.FFmpegFrameGrabber
+import org.bytedeco.javacv.Java2DFrameConverter
 import java.awt.image.BufferedImage
 import java.io.File
-import java.nio.FloatBuffer
-import javax.imageio.ImageIO
 import kotlin.math.absoluteValue
-import kotlin.math.max
-import kotlin.math.min
 
-fun loadNames(path: String): List<String> =
-    File(path).readLines().filter { it.isNotBlank() }
-        .also { check(it.size == 80) { "Expecting 80 names, but got ${it.size}" } }
-
-fun FloatBuffer.set4d(
-    batch: Int,
-    channel: Int, channelSize: Int,
-    y: Int, height: Int,
-    x: Int, width: Int,
-    value: Float
-) {
-    val idx = batch * width * height * channelSize + channel * width * height + y * width + x
-    put(idx, value)
+fun disableFFmpegLog() {
+    avutil.av_log_set_level(avutil.AV_LOG_QUIET)
 }
 
-fun FloatBuffer.get4d(
-    batch: Int,
-    channel: Int, channelSize: Int,
-    y: Int, height: Int,
-    x: Int, width: Int
-): Float {
-    val idx = batch * width * height * channelSize + channel * width * height + y * width + x
-    return get(idx)
-}
+fun CoroutineScope.ffmpegVideoFrameChannel(
+    video: File, bufferedFrame: Int
+): ReceiveChannel<BufferedImage> {
+    val channel = Channel<BufferedImage>(capacity = bufferedFrame)
+    launch(Dispatchers.Default) {
+        val grabber = FFmpegFrameGrabber(video)
+        // converter need this format
+        grabber.pixelFormat = AV_PIX_FMT_BGR24
+        val converter = Java2DFrameConverter()
 
-fun FloatBuffer.set3d(
-    channel: Int,
-    y: Int, height: Int,
-    x: Int, width: Int,
-    value: Float
-) {
-    val idx = channel * width * height + y * width + x
-    put(idx, value)
-}
-
-fun FloatBuffer.get3d(
-    channel: Int,
-    y: Int, height: Int,
-    x: Int, width: Int
-): Float {
-    val idx = channel * width * height + y * width + x
-    return get(idx)
-}
-
-data class Detection(
-    val centerX: Int,
-    val centerY: Int,
-    val width: Int,
-    val height: Int,
-    val confidence: Float,
-    val classId: Int,
-    val className: String
-) {
-    /**
-     * Calculate intersection area, return all 0 if not intersect.
-     *
-     * @return the intersection area.
-     * */
-    private fun intersectionArea(other: Detection): Double {
-        val ourX1 = centerX - width / 2.0
-        val ourY1 = centerY - height / 2.0
-        val ourX2 = ourX1 + width
-        val ourY2 = ourY1 + height
-
-        val otherX1 = other.centerX - other.width / 2.0
-        val otherY1 = other.centerY - other.height / 2.0
-        val otherX2 = otherX1 + other.width
-        val otherY2 = otherY1 + other.height
-
-        // use the leftest x2 minus rightest x1, clamp to 0
-        val width = (min(ourX2, otherX2) - max(ourX1, otherX1)).coerceAtLeast(0.0)
-        // use the lowest y2 minus the highest y1, clamp to 0
-        val height = (min(ourY2, otherY2) - max(ourY1, otherY1))
-        return width * height
+        grabber.start()
+        while (true) {
+            // the frame is reused internally in grabber
+            val frame = grabber.grabImage() ?: break
+            // the image is reused internally in converter, thus it's unsafe
+            val unsafeImage = converter.getBufferedImage(frame)
+            // copy the image
+            val safeImage = Java2DFrameConverter.cloneBufferedImage(unsafeImage)
+            // yield the safe copy
+            try {
+                channel.send(safeImage)
+            } catch (e: CancellationException) {
+                break
+            }
+        }
+        grabber.close()
+        converter.close()
+        channel.close()
     }
-
-    /**
-     * IoU = intersection area / union area,
-     * where union area = our area + other area - intersection area
-     * */
-    fun calculateIoU(other: Detection): Double {
-        val ourArea = width.toDouble() * height
-        val otherArea = other.width.toDouble() * height
-        val intersection = intersectionArea(other)
-        val unionArea = ourArea + otherArea - intersection
-        return intersection / unionArea
-    }
+    return channel
 }
 
 private val colors: List<Color> by lazy {
