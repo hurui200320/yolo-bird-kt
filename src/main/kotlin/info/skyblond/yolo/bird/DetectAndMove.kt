@@ -7,11 +7,11 @@ import java.io.File
 import kotlin.math.ceil
 import kotlin.time.measureTime
 
-private const val confidenceThreshold = 0.25f // 0.7f
+private const val confidenceThreshold = 0.35f // 0.7f
 private const val nmsThreshold = 0.7 // 0.4
-private const val skip = 8 // take 1 frame out of 8
+private const val skip = 8 // take 1 frame out of `skip` frames
 
-private val aws = System.getProperty("os.name").lowercase().contains("windows")
+private val aws = !System.getProperty("os.name").lowercase().contains("windows")
 
 private val rootFolder = if (aws) File("/opt/dlami/nvme") else File("D:/modet")
 private val inputFolder = File(rootFolder, "chunk")
@@ -42,7 +42,7 @@ fun main(): Unit = runBlocking {
     println("Model output labels ${yoloV8.outputLabelSize - 4}")
 
     // load some video files in channel
-    val videoChannel = readVideoFiles(inputFolder, 1, skip)
+    val videoChannel = readVideoFiles(inputFolder, 0, skip)
 
     for ((file, video) in videoChannel) {
         var counter = 0

@@ -32,7 +32,7 @@ aws s3 cp --recursive s3://skyblond-yolo-bird/chunk /opt/dlami/nvme/chunk/
 pip3 install torch torchvision torchaudio ultralytics
 wget https://github.com/ultralytics/assets/releases/download/v8.2.0/yolov8x.pt
 export PATH=$PATH:/home/ubuntu/.local/bin
-yolo export model=yolov8x.pt format=onnx imgsz=1080,1920 batch=10
+yolo export model=yolov8x.pt format=onnx imgsz=1080,1920 batch=7
 
 cd yolo-bird-kt
 chmod +x ./gradlew

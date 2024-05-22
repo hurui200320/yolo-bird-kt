@@ -2,6 +2,7 @@ import org.gradle.nativeplatform.platform.internal.DefaultNativePlatform
 
 plugins {
     kotlin("jvm") version "1.9.23"
+    application
 }
 
 group = "info.skyblond"
@@ -33,11 +34,8 @@ kotlin {
     jvmToolchain(21)
 }
 
-tasks.register<JavaExec>("runDetect") {
-    dependsOn("classes")
-    classpath = sourceSets.main.get().runtimeClasspath
+application {
     mainClass.set("info.skyblond.yolo.bird.DetectAndMoveKt")
     if (DefaultNativePlatform.getCurrentOperatingSystem().isLinux)
-        jvmArgs("-Djava.awt.headless=true")
-    standardOutput = System.out
+        applicationDefaultJvmArgs = listOf("-Djava.awt.headless=true")
 }
