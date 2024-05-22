@@ -7,6 +7,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
+import kotlinx.coroutines.channels.consumeEach
 import kotlinx.coroutines.launch
 import org.bytedeco.ffmpeg.global.avutil
 import org.bytedeco.ffmpeg.global.avutil.AV_PIX_FMT_BGR24
@@ -51,6 +52,25 @@ fun CoroutineScope.ffmpegVideoFrameChannel(
     }
     return channel
 }
+
+fun CoroutineScope.readVideoFiles(inputFolder: File, buffer: Int, skip: Int): ReceiveChannel<Pair<File, List<BufferedImage>>> {
+    val channel = Channel<Pair<File, List<BufferedImage>>>(buffer)
+    launch {
+        inputFolder.listFiles { it: File -> it.isFile }!!.forEach { file ->
+            val frames = buildList {
+                var counter = 0
+                ffmpegVideoFrameChannel(file, Channel.UNLIMITED).consumeEach {
+                    if (counter % skip == 0) add(it)
+                    counter++
+                }
+            }
+            channel.send(file to frames)
+        }
+        channel.close()
+    }
+    return channel
+}
+
 
 private val colors: List<Color> by lazy {
     buildList {
