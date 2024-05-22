@@ -2,13 +2,7 @@ package info.skyblond.yolo.bird
 
 import ai.onnxruntime.OrtEnvironment
 import ai.onnxruntime.OrtSession.SessionOptions
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.channels.ReceiveChannel
-import kotlinx.coroutines.channels.consumeEach
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import java.awt.image.BufferedImage
 import java.io.File
 import kotlin.math.ceil
 import kotlin.time.measureTime
@@ -17,15 +11,18 @@ private const val confidenceThreshold = 0.25f // 0.7f
 private const val nmsThreshold = 0.7 // 0.4
 private const val skip = 8 // take 1 frame out of 8
 
-private val rootFolder = File("D:/modet")
+private val aws = System.getenv("AWS_EXECUTION_ENV") != null
+
+private val rootFolder = if (aws) File("/data") else File("D:/modet")
 private val inputFolder = File(rootFolder, "chunk")
 private val interestFolder = File(rootFolder, "bird").also { it.mkdirs() }
 private val boringFolder = File(rootFolder, "boring").also { it.mkdirs() }
-private val model = File("D:\\code\\PycharmProjects\\yolov8\\yolov8l.onnx")
+private val model = if (aws) File("/data/yolov8x.onnx") else File("D:\\code\\PycharmProjects\\yolov8\\yolov8l.onnx")
 
 private val interestLabels = listOf("bird")
 
 fun main(): Unit = runBlocking {
+    if (aws) println("We're running on AWS EC2!")
     disableFFmpegLog()
     println("Loading model...")
     val env = OrtEnvironment.getEnvironment()

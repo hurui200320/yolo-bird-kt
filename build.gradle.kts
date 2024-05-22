@@ -27,3 +27,10 @@ tasks.test {
 kotlin {
     jvmToolchain(21)
 }
+
+tasks.register<JavaExec>("runDetect") {
+    dependsOn("classes")
+    classpath = sourceSets.main.get().runtimeClasspath
+    mainClass.set("info.skyblond.yolo.bird.DetectAndMoveKt")
+    standardOutput = System.out
+}

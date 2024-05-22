@@ -25,15 +25,27 @@ sudo mkfs -t xfs /dev/nvme1n1
 sudo mkdir /data
 sudo mount /dev/nvme1n1 /data
 sudo chmod -R 777 /data
+
 cd /data
 sudo yum upgrade -y
 sudo yum install -y htop python3-pip mesa-libGL git
-pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
-pip3 install ultralytics glances
 wget https://corretto.aws/downloads/latest/amazon-corretto-21-x64-linux-jdk.rpm
 sudo yum localinstall -y amazon-corretto-21-x64-linux-jdk.rpm
+
+git clone https://github.com/hurui200320/yolo-bird-kt.git
+# use mv to download and delete data
+aws s3 cp --recursive s3://skyblond-yolo-bird/chunk /data/chunk/
+
+pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+pip3 install ultralytics glances
 wget https://github.com/ultralytics/assets/releases/download/v8.2.0/yolov8x.pt
 yolo export model=yolov8x.pt format=onnx imgsz=1080,1920 batch=10
+
+cd yolo-bird-kt
+chmod +x ./gradlew
+./gradlew runDetect
+
+aws s3 cp --recursive /data/bird/ s3://skyblond-yolo-bird/bird/
 ```
 
 TODO: FFMPEG?
