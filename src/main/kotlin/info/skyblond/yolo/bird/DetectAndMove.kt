@@ -45,16 +45,15 @@ fun main(): Unit = runBlocking {
     val videoChannel = readVideoFiles(inputFolder, 1, skip)
 
     for ((file, video) in videoChannel) {
-        var counter = 0
+        println("Processing $file, total frame: ${video.size}")
+        println("+".repeat(ceil(video.size / yoloV8.batchSizeInt.toDouble()).toInt()))
+
         val time = measureTime {
-            println("Processing $file, total frame: ${video.size}")
-            println("+".repeat(ceil(video.size / yoloV8.batchSizeInt.toDouble()).toInt()))
-            val hasBird = video.chunked(yoloV8.batchSizeInt).any { batch ->
-                val result = yoloV8.doInference(batch, confidenceThreshold, nmsThreshold)
-                counter += batch.size
+            val result = yoloV8.doInference(video, confidenceThreshold, nmsThreshold) {
                 print("*")
-                result.flatten().any { it.className in interestLabels }.also { System.gc() }
             }
+            val hasBird = result.flatten().any { it.className in interestLabels }
+            System.gc()
             println()
             print(if (hasBird) "Interest detected!" else "Boring...")
             file.copyTo(
@@ -63,7 +62,8 @@ fun main(): Unit = runBlocking {
             )
             file.delete()
         }
-        println(" Processed $counter frames, time: $time, ${"%.4f".format(counter.toDouble() / time.inWholeSeconds)} fps")
+
+        println("Time usage: $time, ${"%.4f".format(video.size.toDouble() / time.inWholeSeconds)} fps")
         System.gc()
     }
 

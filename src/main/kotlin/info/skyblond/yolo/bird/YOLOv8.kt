@@ -75,14 +75,16 @@ class YOLOv8(
     fun doInference(
         images: List<BufferedImage>,
         minConfident: Float,
-        nmsThreshold: Double
+        nmsThreshold: Double,
+        afterBatchFinish: (List<List<Detection>>) -> Unit = {}
     ): List<List<Detection>> = runBlocking(Dispatchers.Default) {
-        images.chunked(batchSizeInt).map {
-            async { makeInputFromImage(images.map { ensureRGB(it) }) to images.size }
-        }.map {
-            val (tensor, size) = it.await()
+        images.chunked(batchSizeInt).map { b ->
+            async { makeInputFromImage(b.map { ensureRGB(it) }) to b.size }
+        }.map { r ->
+            val (tensor, size) = r.await()
             doBatch(tensor, size, minConfident, nmsThreshold)
                 .also { tensor.close() }
+                .also { afterBatchFinish(it) }
         }.flatten()
     }
 
