@@ -2,6 +2,8 @@ package info.skyblond.yolo.bird
 
 import ai.onnxruntime.OrtEnvironment
 import ai.onnxruntime.OrtSession.SessionOptions
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import java.io.File
 import kotlin.math.ceil
@@ -21,7 +23,7 @@ private val model = if (aws) File("/workspace/yolov8x.onnx") else File("D:\\code
 
 private val interestLabels = listOf("bird")
 
-fun main(): Unit = runBlocking {
+fun main(): Unit = runBlocking(Dispatchers.Default) {
     if (aws) println("We're running on AWS EC2!")
     disableFFmpegLog()
     println("Loading model...")
@@ -56,11 +58,13 @@ fun main(): Unit = runBlocking {
             System.gc()
             println()
             print(if (hasBird) "Interest detected!" else "Boring...")
-            file.copyTo(
-                File(if (hasBird) interestFolder else boringFolder, file.name),
-                overwrite = true
-            )
-            file.delete()
+            launch(Dispatchers.IO) {
+                file.copyTo(
+                    File(if (hasBird) interestFolder else boringFolder, file.name),
+                    overwrite = true
+                )
+                file.delete()
+            }
         }
 
         println("Time usage: $time, ${"%.4f".format(video.size.toDouble() / time.inWholeSeconds)} fps")
