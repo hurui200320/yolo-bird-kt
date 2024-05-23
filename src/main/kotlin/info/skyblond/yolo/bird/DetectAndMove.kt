@@ -9,7 +9,7 @@ import kotlin.time.measureTime
 
 private const val confidenceThreshold = 0.35f // 0.7f
 private const val nmsThreshold = 0.7 // 0.4
-private const val skip = 8 // take 1 frame out of `skip` frames
+private const val skip = 4 // take 1 frame out of `skip` frames
 
 private val aws = !System.getProperty("os.name").lowercase().contains("windows")
 

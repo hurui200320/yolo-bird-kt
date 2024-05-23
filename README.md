@@ -26,7 +26,7 @@ wget https://github.com/ultralytics/assets/releases/download/v8.2.0/yolov8x.pt
 yolo export model=yolov8x.pt format=onnx imgsz=1080,1920 batch=10
 
 cd yolo-bird-kt
-chmod +x ./gradlew
+git pull && chmod +x ./gradlew
 ./gradlew installDist && cp coco.names build/install/yolo-bird-kt/
 ./build/install/yolo-bird-kt/bin/yolo-bird-kt
 ```
