@@ -6,19 +6,20 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import java.io.File
+import javax.imageio.ImageIO
 import kotlin.math.ceil
 import kotlin.time.measureTime
 
-private const val confidenceThreshold = 0.35f // 0.7f
-private const val nmsThreshold = 0.7 // 0.4
-private const val skip = 4 // take 1 frame out of `skip` frames
+private const val confidenceThreshold = 0.6f
+private const val nmsThreshold = 0.7
+private const val skip = 6 // take 1 frame out of `skip` frames
 
 private val aws = !System.getProperty("os.name").lowercase().contains("windows")
 
 private val rootFolder = if (aws) File("/workspace") else File("D:/modet")
 private val inputFolder = File(rootFolder, "chunk")
 private val interestFolder = File(rootFolder, "bird").also { it.mkdirs() }
-private val boringFolder = File(rootFolder, "boring").also { it.mkdirs() }
+private val evidenceFolder = File(rootFolder, "evidence").also { it.mkdirs() }
 private val model = if (aws) File("/workspace/yolov8x.onnx") else File("D:\\code\\PycharmProjects\\yolov8\\yolov8l.onnx")
 
 private val interestLabels = listOf("bird")
@@ -28,7 +29,7 @@ fun main(): Unit = runBlocking(Dispatchers.Default) {
     disableFFmpegLog()
     println("Loading model...")
     val env = OrtEnvironment.getEnvironment()
-    val yoloV8 = YOLOv8(env, model, File("coco.names")) {
+    val yoloV8 = YOLOv8(env, cocoNames, model) {
         addCUDA()
         setOptimizationLevel(SessionOptions.OptLevel.ALL_OPT)
         setExecutionMode(SessionOptions.ExecutionMode.PARALLEL)
@@ -48,21 +49,34 @@ fun main(): Unit = runBlocking(Dispatchers.Default) {
 
     for ((file, video) in videoChannel) {
         println("Processing $file, total frame: ${video.size}")
-        println("+".repeat(ceil(video.size / yoloV8.batchSizeInt.toDouble()).toInt()))
+        println("*".repeat(ceil(video.size / yoloV8.batchSizeInt.toDouble()).toInt()))
 
         val time = measureTime {
-            val result = yoloV8.doInference(video, confidenceThreshold, nmsThreshold) {
-                print("*")
+            val result = yoloV8.doInference(video, confidenceThreshold, nmsThreshold) { l ->
+                if (l.flatten().any { it.className in interestLabels })
+                    print("+")
+                else print("-")
             }
-            val hasBird = result.flatten().any { it.className in interestLabels }
-            System.gc()
             println()
-            print(if (hasBird) "Interest detected!" else "Boring...")
+            val (interestFrame, interestDetections) = video.zip(result)
+                .filter { (_, d) -> d.any { it.className in interestLabels } }
+                .maxByOrNull { (_, d) -> d.maxOf { it.confidence } }
+                ?: (null to emptyList())
+
+            if (interestFrame != null) {
+                println("Interest detected!")
+                launch(Dispatchers.IO) {
+                    interestDetections.filter { it.className in interestLabels }
+                        .sortedBy { it.confidence }
+                        .forEach { it.drawOn(interestFrame) }
+                    ImageIO.write(interestFrame, "png", File(evidenceFolder, file.nameWithoutExtension + ".png"))
+                }
+            } else {
+                println("Boring!")
+            }
             launch(Dispatchers.IO) {
-                file.copyTo(
-                    File(if (hasBird) interestFolder else boringFolder, file.name),
-                    overwrite = true
-                )
+                if (interestFrame != null)
+                    file.copyTo(File(interestFolder, file.name), overwrite = true)
                 file.delete()
             }
         }

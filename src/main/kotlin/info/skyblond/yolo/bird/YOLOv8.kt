@@ -22,14 +22,13 @@ import java.util.*
  * */
 class YOLOv8(
     private val ortEnv: OrtEnvironment,
-    model: File, names: File,
-    sessionSetup: SessionOptions.() -> Unit
+    private val labels: List<String>,
+    model: File, sessionSetup: SessionOptions.() -> Unit
 ) : AutoCloseable {
     private val session: OrtSession = ortEnv.createSession(
         model.absolutePath,
         SessionOptions().apply(sessionSetup)
     )
-    private val labels = names.readLines().filter { it.isNotBlank() }
 
     private val inputName: String
     private val inputShape: LongArray

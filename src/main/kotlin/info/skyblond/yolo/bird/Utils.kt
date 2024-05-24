@@ -53,10 +53,14 @@ fun CoroutineScope.ffmpegVideoFrameChannel(
     return channel
 }
 
-fun CoroutineScope.readVideoFiles(inputFolder: File, buffer: Int, skip: Int): ReceiveChannel<Pair<File, List<BufferedImage>>> {
+fun CoroutineScope.readVideoFiles(
+    inputFolder: File, buffer: Int, skip: Int
+): ReceiveChannel<Pair<File, List<BufferedImage>>> {
     val channel = Channel<Pair<File, List<BufferedImage>>>(buffer)
     launch {
-        inputFolder.listFiles { it: File -> it.isFile }!!.forEach { file ->
+        inputFolder.listFiles { it: File ->
+            it.isFile && it.nameWithoutExtension.isNotBlank()
+        }!!.forEach { file ->
             val frames = buildList {
                 var counter = 0
                 ffmpegVideoFrameChannel(file, Channel.UNLIMITED).consumeEach {
@@ -71,10 +75,28 @@ fun CoroutineScope.readVideoFiles(inputFolder: File, buffer: Int, skip: Int): Re
     return channel
 }
 
+val cocoNames = listOf(
+    "person", "bicycle", "car", "motorbike", "aeroplane",
+    "bus", "train", "truck", "boat", "traffic light",
+    "fire hydrant", "stop sign", "parking meter", "bench", "bird",
+    "cat", "dog", "horse", "sheep", "cow",
+    "elephant", "bear", "zebra", "giraffe", "backpack",
+    "umbrella", "handbag", "tie", "suitcase", "frisbee",
+    "skis", "snowboard", "sports ball", "kite", "baseball bat",
+    "baseball glove", "skateboard", "surfboard", "tennis racket", "bottle",
+    "wine glass", "cup", "fork", "knife", "spoon",
+    "bowl", "banana", "apple", "sandwich", "orange",
+    "broccoli", "carrot", "hot dog", "pizza", "donut",
+    "cake", "chair", "sofa", "pottedplant", "bed",
+    "diningtable", "toilet", "tvmonitor", "laptop", "mouse",
+    "remote", "keyboard", "cell phone", "microwave", "oven",
+    "toaster", "sink", "refrigerator", "book", "clock",
+    "vase", "scissors", "teddy bear", "hair drier", "toothbrush"
+)
 
 private val colors: List<Color> by lazy {
     buildList {
-        for (i in 0..360 step 10) {
+        for (i in 0..360 step 20) {
             add(Oklch(0.7, 0.1, i.toDouble()))
         }
     }
