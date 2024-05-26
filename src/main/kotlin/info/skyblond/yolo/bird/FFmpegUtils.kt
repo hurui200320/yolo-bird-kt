@@ -25,7 +25,7 @@ fun splitVideos(
         it.isFile && it.extension.lowercase() == extension.lowercase()
     })!!.forEach { file ->
         val p = ffmpeg.startFFmpeg(
-            "-f", "segment", "-i", file.absolutePath,
+            "-i", file.absolutePath, "-f", "segment",
             "-segment_time", duration.toSeconds().toString(),
             "-vcodec", "copy", "-acodec", "copy",
             "-reset_timestamps", "1", "-map", "0",
@@ -103,8 +103,13 @@ fun CliktCommand.concatVideos(
  * @return the process, already started
  * */
 private fun String.startFFmpeg(vararg args: String) = ProcessBuilder(
-    listOf(this, "-y", "-hide_banner", "-loglevel", "error") + args
-).start()
+    listOf(
+        this, "-y", "-hide_banner", "-loglevel", "error"
+    ) + args
+).also {
+    it.redirectError(ProcessBuilder.Redirect.INHERIT)
+    it.redirectOutput(ProcessBuilder.Redirect.INHERIT)
+}.start()
 
 
 /**
