@@ -25,6 +25,27 @@ class YOLOv8(
     private val labels: List<String>,
     model: File, sessionSetup: SessionOptions.() -> Unit
 ) : AutoCloseable {
+    companion object {
+        val cocoNames = listOf(
+            "person", "bicycle", "car", "motorbike", "aeroplane",
+            "bus", "train", "truck", "boat", "traffic light",
+            "fire hydrant", "stop sign", "parking meter", "bench", "bird",
+            "cat", "dog", "horse", "sheep", "cow",
+            "elephant", "bear", "zebra", "giraffe", "backpack",
+            "umbrella", "handbag", "tie", "suitcase", "frisbee",
+            "skis", "snowboard", "sports ball", "kite", "baseball bat",
+            "baseball glove", "skateboard", "surfboard", "tennis racket", "bottle",
+            "wine glass", "cup", "fork", "knife", "spoon",
+            "bowl", "banana", "apple", "sandwich", "orange",
+            "broccoli", "carrot", "hot dog", "pizza", "donut",
+            "cake", "chair", "sofa", "pottedplant", "bed",
+            "diningtable", "toilet", "tvmonitor", "laptop", "mouse",
+            "remote", "keyboard", "cell phone", "microwave", "oven",
+            "toaster", "sink", "refrigerator", "book", "clock",
+            "vase", "scissors", "teddy bear", "hair drier", "toothbrush"
+        )
+    }
+
     private val session: OrtSession = ortEnv.createSession(
         model.absolutePath,
         SessionOptions().apply(sessionSetup)
@@ -44,8 +65,8 @@ class YOLOv8(
     private val outputShape: LongArray
 
     val outputLabelSize get() = outputShape[1]
-    val outputLabelSizeInt get() = outputLabelSize.toIntSafe()
-    val outputAnchorSize get() = outputShape[2]
+    private val outputLabelSizeInt get() = outputLabelSize.toIntSafe()
+    private val outputAnchorSize get() = outputShape[2]
 
     init {
         // check input shape        
@@ -73,15 +94,14 @@ class YOLOv8(
      * */
     fun doInference(
         images: List<BufferedImage>,
-        minConfident: Float,
-        nmsThreshold: Double,
+        inferenceParameter: InferenceParameter,
         afterBatchFinish: (List<List<Detection>>) -> Unit = {}
     ): List<List<Detection>> = runBlocking(Dispatchers.Default) {
         images.chunked(batchSizeInt).map { b ->
             async { makeInputFromImage(b.map { ensureRGB(it) }) to b.size }
         }.map { r ->
             val (tensor, size) = r.await()
-            doBatch(tensor, size, minConfident, nmsThreshold)
+            doBatch(tensor, size, inferenceParameter)
                 .also { tensor.close() }
                 .also { afterBatchFinish(it) }
         }.flatten()
@@ -95,8 +115,7 @@ class YOLOv8(
      * */
     private fun doBatch(
         inputTensor: OnnxTensor, size: Int,
-        minConfident: Float,
-        nmsThreshold: Double
+        inferenceParameter: InferenceParameter
     ): List<List<Detection>> {
         val input = mapOf(inputName to inputTensor)
         val detections = session.run(input).use { output ->
@@ -106,18 +125,18 @@ class YOLOv8(
                 // don't take the padding one
                 (0 until size).map {
                     async {
-                        decodeResult(outputTensor, it, minConfident)
+                        decodeResult(outputTensor, it, inferenceParameter)
                     }
                 }.awaitAll()
             }
         }
-        return detections.map { nms(it, nmsThreshold) }
+        return detections.map { nms(it, inferenceParameter.nmsThreshold) }
     }
 
     /**
      * Decode the [batch]-th result from the model output
      * */
-    private fun decodeResult(output: OnnxTensor, batch: Int, minConfident: Float): List<Detection> {
+    private fun decodeResult(output: OnnxTensor, batch: Int, inferenceParameter: InferenceParameter): List<Detection> {
         // shape: [batchSize, 84, ...]
         // rows: 0,1,2,3: box x,y,w,h
         // rows: 4..84: 80 labels
@@ -131,7 +150,7 @@ class YOLOv8(
             // box: x,y,w,h
             val box = FloatArray(4) { rawOutput[batch, it, i] }
             var maxScore = Float.MIN_VALUE
-            var maxIndex = -1
+            var maxIndex = 0 // index safe default value
             // find the best one for this anchor point
             for (j in 4 until outputLabelSizeInt) {
                 val s = rawOutput[batch, j, i]
@@ -141,7 +160,7 @@ class YOLOv8(
                 }
             }
             // skip if not confidence
-            if (maxScore < minConfident) continue
+            if (maxScore < inferenceParameter.getThreshold(labels[maxIndex])) continue
             val detection = Detection(
                 centerX = box[0].toInt(), centerY = box[1].toInt(),
                 width = box[2].toInt(), height = box[3].toInt(),
