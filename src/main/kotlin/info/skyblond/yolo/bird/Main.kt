@@ -210,7 +210,7 @@ class MainCommand : CliktCommand(
             val time = measureTime {
                 val result = yoloV8.doInference(video, inferenceParameter) { l ->
                     if (l.flatten().any()) echo(terminal.theme.warning("+"), trailingNewline = false)
-                    else echo(terminal.theme.info("+"), trailingNewline = false)
+                    else echo(terminal.theme.info("-"), trailingNewline = false)
                 }
                 echo()
 
