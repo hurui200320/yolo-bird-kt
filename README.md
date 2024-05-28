@@ -92,6 +92,19 @@ https://cloud.vast.ai/?ref_id=61326
 After setting up the cloud sync feature on vast.ai, I normally rent a RTX 4090
 from a data center located in Norway. Usually less than 0.5 USD/Hour.
 
+### Prepare model
+
+I'm using yolov8x with coco dataset:
+
+```shell
+sudo apt update && sudo apt install -y python3-pip
+pip3 install torch torchvision torchaudio ultralytics
+wget https://github.com/ultralytics/assets/releases/download/v8.2.0/yolov8x.pt
+yolo export model=yolov8x.pt format=onnx imgsz=1080,1920 batch=10
+```
+
+Then upload the onnx model to the backblaze so you can reuse the model.
+
 ### vast.ai
 
 Here is my full set up:
@@ -109,14 +122,10 @@ The setup command is:
 ```bash
 touch ~/.no_auto_tmux
 cd /workspace
+DEBIAN_FRONTEND=noninteractive
 sudo apt update && sudo apt full-upgrade -y
-sudo apt install -y openjdk-21-jdk htop git python3-pip glances ffmpeg
+sudo apt install -y openjdk-21-jdk htop git glances ffmpeg
 git clone https://github.com/hurui200320/yolo-bird-kt.git
-
-cd /workspace
-pip3 install torch torchvision torchaudio ultralytics
-wget https://github.com/ultralytics/assets/releases/download/v8.2.0/yolov8x.pt
-yolo export model=yolov8x.pt format=onnx imgsz=1080,1920 batch=10
 
 cd /workspace/yolo-bird-kt
 git pull && chmod +x ./gradlew

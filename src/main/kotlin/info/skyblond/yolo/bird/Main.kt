@@ -215,6 +215,7 @@ class MainCommand : CliktCommand(
                 echo()
 
                 val (interestFrame, interestDetections) = video.zip(result)
+                    .filter { it.second.isNotEmpty() }
                     .maxByOrNull { (_, d) -> d.maxOf { it.confidence } }
                     ?: (null to emptyList())
 
