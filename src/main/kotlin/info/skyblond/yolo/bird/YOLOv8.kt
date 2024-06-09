@@ -15,6 +15,7 @@ import java.awt.image.BufferedImage
 import java.io.File
 import java.nio.FloatBuffer
 import java.util.*
+import java.util.concurrent.atomic.AtomicBoolean
 
 
 /**
@@ -95,14 +96,17 @@ class YOLOv8(
     fun doInference(
         images: List<BufferedImage>,
         inferenceParameter: InferenceParameter,
+        skipBatch: AtomicBoolean = AtomicBoolean(false),
         afterBatchFinish: (List<List<Detection>>) -> Unit = {}
     ): List<List<Detection>> = runBlocking(Dispatchers.Default) {
         images.chunked(batchSizeInt).map { b ->
             async { makeInputFromImage(b.map { ensureRGB(it) }) to b.size }
         }.map { r ->
             val (tensor, size) = r.await()
-            doBatch(tensor, size, inferenceParameter)
-                .also { tensor.close() }
+            val result = // skip batch gives an empty result
+                if (skipBatch.get()) emptyList()
+                else doBatch(tensor, size, inferenceParameter)
+            result.also { tensor.close() }
                 .also { afterBatchFinish(it) }
         }.flatten()
     }

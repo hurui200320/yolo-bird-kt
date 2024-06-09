@@ -12,7 +12,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import java.io.File
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 import java.time.Duration
+import java.util.concurrent.atomic.AtomicBoolean
 import javax.imageio.ImageIO
 import kotlin.math.ceil
 import kotlin.time.measureTime
@@ -208,9 +211,16 @@ class MainCommand : CliktCommand(
             echoInfo("*".repeat(ceil(video.size / yoloV8.batchSizeInt.toDouble()).toInt()))
 
             val time = measureTime {
-                val result = yoloV8.doInference(video, inferenceParameter) { l ->
-                    if (l.flatten().any()) echo(terminal.theme.warning("+"), trailingNewline = false)
-                    else echo(terminal.theme.info("-"), trailingNewline = false)
+                val skipBatch = AtomicBoolean(false)
+                val result = yoloV8.doInference(video, inferenceParameter, skipBatch) { l ->
+                    if (skipBatch.get()) {
+                        echo(terminal.theme.info("?"), trailingNewline = false)
+                    } else {
+                        if (l.flatten().any()) {
+                            skipBatch.set(true)
+                            echo(terminal.theme.warning("+"), trailingNewline = false)
+                        } else echo(terminal.theme.info("-"), trailingNewline = false)
+                    }
                 }
                 echo()
 
@@ -232,8 +242,12 @@ class MainCommand : CliktCommand(
                 }
                 launch(Dispatchers.IO) {
                     if (interestFrame != null)
-                        file.copyTo(File(interestFolder, file.name), overwrite = true)
-                    file.delete()
+                        Files.move(
+                            file.toPath(),
+                            File(interestFolder, file.name).toPath(),
+                            StandardCopyOption.REPLACE_EXISTING
+                        )
+                    else file.delete()
                 }
             }
 

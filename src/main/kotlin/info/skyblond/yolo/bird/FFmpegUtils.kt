@@ -8,6 +8,8 @@ import org.bytedeco.javacv.Java2DFrameConverter
 import java.awt.image.BufferedImage
 import java.io.File
 import java.io.FileFilter
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 import java.time.Duration
 
 
@@ -36,10 +38,12 @@ fun splitVideos(
             processedFolder,
             file.nameWithoutExtension.split("_").take(2).joinToString("_")
         ).also { it.mkdirs() }
-        file.copyTo(File(dayFolder, file.name), true)
         p.waitFor()
         // delete old file after finished
-        file.delete()
+        val newFile = File(dayFolder, file.name)
+        val metaTime = file.getMetaTime()
+        Files.move(file.toPath(), newFile.toPath(), StandardCopyOption.REPLACE_EXISTING)
+        newFile.setMetaTime(metaTime)
     }
 }
 
@@ -69,6 +73,7 @@ fun CliktCommand.concatVideos(
         val listContent = files.sortedBy {
             val l = it.nameWithoutExtension.split("_")
             // l[2]: HH-MM => HHMM
+            //   or: HH-MM-SS => HHMMSS
             val time = l[2].replace("-", "").toLong()
             val id = l[3].toLong()
             // leave 9 digits for clip id

@@ -135,12 +135,21 @@ export GRADLE_BUILD_OMIT_CUDA=1
 ./build/install/yolo-bird-kt/bin/yolo-bird-kt \
     -w /workspace \
     -f mp4 \
-    -i bird:0.6 \
+    -i bird:0.65 \
     -n 0.7 \
     --skip-frame 6 \
     --buffered-video 1 \
     -p /workspace/yolov8x.onnx \
     -c 
+    
+rm -rf yolo* raw clip
+# then upload the evidence and interest folder to b2 bucket
+```
+
+Or locally on Windows:
+
+```powershell
+./build/install/yolo-bird-kt/bin/yolo-bird-kt -w D:\modet -f mp4 -i bird:0.65 -n 0.7 --skip-frame 12 --buffered-video 2 -p D:\code\PycharmProjects\yolov8\yolov8x.onnx -c
 ```
 
 The last command will first process (`-p`) all clips, delete the boring one

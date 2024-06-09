@@ -10,6 +10,10 @@ import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.launch
 import java.awt.image.BufferedImage
 import java.io.File
+import java.nio.file.Files
+import java.nio.file.attribute.BasicFileAttributeView
+import java.nio.file.attribute.BasicFileAttributes
+import java.nio.file.attribute.FileTime
 import kotlin.math.absoluteValue
 
 /**
@@ -57,3 +61,13 @@ fun File.subDir(pathName: String) = File(this, pathName).also { it.mkdirs() }
 fun CliktCommand.echoInfo(string: String) = echo(terminal.theme.info(string))
 fun CliktCommand.echoSuccess(string: String) = echo(terminal.theme.success(string))
 fun CliktCommand.echoWarning(string: String) = echo(terminal.theme.warning(string))
+
+typealias FileMetaTime = Triple<FileTime, FileTime, FileTime>
+
+fun File.setMetaTime(meta: FileMetaTime) = this
+    .let { Files.getFileAttributeView(this.toPath(), BasicFileAttributeView::class.java) }
+    .setTimes(meta.first, meta.second, meta.third)
+
+fun File.getMetaTime(): FileMetaTime = this
+    .let { Files.readAttributes(this.toPath(), BasicFileAttributes::class.java) }
+    .let { Triple(it.lastModifiedTime(), it.lastAccessTime(), it.creationTime()) }
